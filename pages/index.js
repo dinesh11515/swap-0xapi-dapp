@@ -2,33 +2,56 @@ import Head from 'next/head'
 import Image from 'next/image'
 import styles from '../styles/Home.module.css'
 import { ethers } from 'ethers';
+import Web3 from 'web3';
 import qs from 'qs';
 import { useState } from 'react';
 import { Fragment} from 'react'
 import { Listbox, Transition } from '@headlessui/react'
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid'
+import {abi} from "../constants/index";
+import { BigNumber } from 'ethers';
 export default function Home() {
 
   const [connected, setConnected] = useState(false);
   const [provider,setProvider] = useState(null);
   const [account,setAccount] = useState(null);
 
-  const people = [
-    { name: 'Wade Cooper' },
-    { name: 'Arlene Mccoy' },
-    { name: 'Devon Webb' },
-    { name: 'Tom Cook' },
-    { name: 'Tanya Fox' },
-    { name: 'Hellen Schmidt' },
+  const coins = [
+    {name:"USDT",address:"0xc2132D05D31c914a87C6611C10748AEb04B58e8F" ,decimals:6},
+    {name:"DAI",address:"0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063" ,decimals:18},
   ]
-  const [selected, setSelected] = useState(people[0])
+  const [selected, setSelected] = useState(coins[0])
+  console.log(account)
 
+  const networks = {
+    polygon: {
+      chainId: `0x${Number(137).toString(16)}`,
+      chainName: "Polygon",
+      nativeCurrency: {
+        name: "MATIC",
+        symbol: "MATIC",
+        decimals: 18
+      },
+      rpcUrls: ["https://polygon-rpc.com"],
+      blockExplorerUrls: ["https://polygonscan.com/"]
+    }
+}
 
   const connectWallet = async () => {
     try{
         const provider = new ethers.providers.Web3Provider(window.ethereum);           
         await provider.send("eth_requestAccounts", []);
         const signer = provider.getSigner(account);
+        if(await signer.getChainId() != 137){
+          await window.ethereum.request({
+              method: "wallet_addEthereumChain",
+              params: [
+                  {
+                      ...networks["polygon"]
+                  }
+              ]
+          })
+        }
         setProvider(signer);
         setAccount(await signer.getAddress())
         setConnected(true);
@@ -37,25 +60,41 @@ export default function Home() {
         alert(err.message);
     }
   }
+  
+  const swap = async () => {
+    try{
+      const ZERO_EX_ADDRESS = "0xdef1c0ded9bec7f1a1670819833240f027b25eff"
+      const web3 = new Web3(Web3.givenProvider);
 
-  const swapQuote = async () => {
-    
-    const params = {
-        // Not all token symbols are supported. The address of the token can be used instead.
-        sellToken: 'DAI',
-        buyToken: 'MATIC',
-        // Note that the DAI token uses 18 decimal places, so `sellAmount` is `100 * 10^18`.
-        sellAmount: '100000000000000000000',
+      let amount =  BigNumber.from(""+document.getElementById("amount").value * 10**selected.decimals);
+      const params = {
+          sellToken: selected.name,
+          buyToken: 'MATIC',    
+          sellAmount: amount,
+          takerAddress: account,
+      }
+      const contract = new web3.eth.Contract(abi,selected.address);
+      const tx = await contract.methods.approve(
+        ZERO_EX_ADDRESS,
+        amount,
+      )
+      .send({ from: account })
+      .then(tx => {
+          console.log("tx: ", tx)
+      });
+
+      const response = await fetch(
+          `https://polygon.api.0x.org/swap/v1/quote?${qs.stringify(params)}`
+      );
+      
+      const receipt = await web3.eth.sendTransaction(swapQuoteJSON);
+      console.log("receipt: ", receipt);
     }
-
-    const response = await fetch(
-        `https://polygon.api.0x.org/swap/v1/quote?${qs.stringify(params)}`
-    );
-
-    console.log(await response.json());
+    catch(err){
+      alert(err.message);
+    }
   }
 
-  swapQuote()
 
   return (
     <div className='p-10'>
@@ -66,9 +105,9 @@ export default function Home() {
       </Head>
 
       <div>
-        <div className='flex justify-between'>
+        <div className='px-48 flex justify-between'>
           <h1>Swap Dapp</h1>
-          <button onClick={connectWallet}>{!connected ? "Connect" : "connected"}</button>
+          <button className="p-3 bg-blue-600 rounded-md text-white" onClick={connectWallet}>{!connected ? "Connect" : "Connected"}</button>
         </div>
 
         <div className='flex flex-col items-center mt-28 gap-4'>
@@ -95,7 +134,7 @@ export default function Home() {
                   leaveTo="opacity-0"
                 >
                   <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-                    {people.map((person, personIdx) => (
+                    {coins.map((person, personIdx) => (
                       <Listbox.Option
                         key={personIdx}
                         className={({ active }) =>
@@ -129,7 +168,8 @@ export default function Home() {
             </Listbox>
             </div>
           </div>
-          <button className='p-4 bg-blue-300 rounded-xl'>
+          <input type="number" id="amount" placeholder='Enter Amount' className='m-2 ml-20 h-8'></input>
+          <button className='p-4 bg-blue-300 rounded-xl' onClick={swap}>
             Swap
           </button>
         </div>
