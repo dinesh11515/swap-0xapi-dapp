@@ -172,6 +172,15 @@ export default function Home() {
           <button className='p-4 bg-blue-300 rounded-xl' onClick={swap}>
             Swap
           </button>
+      <iframe
+        src="https://widget.onramper.com?color=266677&apiKey=pk_test_5WfrOwKkrYSETDi1QHfzFZ8rji33wJSjYtuXMdoin380"
+        height="660px"
+        width="482px"
+        title="Onramper widget"
+        frameBorder="0"
+        allow="accelerometer; autoplay; camera; gyroscope; payment"
+      >
+      </iframe>
         </div>
       </div>
     </div>
